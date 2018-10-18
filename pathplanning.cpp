@@ -3,6 +3,7 @@
 #include <rwlibs/pathplanners/rrt/RRTPlanner.hpp>
 #include <rwlibs/pathplanners/rrt/RRTQToQPlanner.hpp>
 #include <rwlibs/proximitystrategies/ProximityStrategyFactory.hpp>
+#include <rw/kinematics.hpp>
 #include <fstream>
 
 using namespace std;
@@ -42,6 +43,8 @@ bool checkCollisions(Device::Ptr device, const State &state, const CollisionDete
 
 void createLUAScript(string fileName, QPath aPath)
 {
+    double sleepTime = 10.0 / aPath.size(); //Complete visualisation should take ~10s
+
     ofstream output(fileName);
 
     if(output.is_open())
@@ -49,18 +52,36 @@ void createLUAScript(string fileName, QPath aPath)
         output << "wc = rws.getRobWorkStudio():getWorkCell()" << endl;
         output << "state = wc:getDefaultState()" << endl;
         output << "device = wc:findDevice (\"KukaKr16\")" << endl;
+        output << "gripper = wc:findFrame(\"Tool\");" << endl;
+        output << "bottle = wc:findFrame(\"Bottle\");" << endl;
+        output << "table = wc:findFrame(\"Table\");" << endl;
+        output << endl;
+
         output << "function setQ(q)" << endl;
         output << "\t qq = rw.Q (#q , q[1] , q[2] , q[3] , q[4] , q[5] , q[6])" << endl;
         output << "\t device:setQ(qq , state )" << endl;
         output << "\t rws.getRobWorkStudio():setState(state)" << endl;
-        output << "\t rw.sleep(0.5)" << endl;
+        output << "\t rw.sleep(" << sleepTime << ")" << endl;
         output << "end" << endl;
         output << endl;
 
-        for(int i = 0; i < aPath.size(); i++)
+        output << "function attach(obj, tool)" << endl;
+        output << "rw.gripFrame(obj, tool, state)" << endl;
+        output << "rws.getRobWorkStudio():setState(state)" << endl;
+        output << "rw.sleep(0.5)" << endl;
+        output << "end" << endl;
+        output << endl;
+
+        output << "setQ({" << aPath[0][0] << ", "  << aPath[0][1] << ", "  << aPath[0][2] << ", "  << aPath[0][3] << ", "  << aPath[0][4] << ", "  << aPath[0][5] << "})" << endl;
+        output << "attach(bottle,gripper)" << endl;
+
+        for(int i = 1; i < aPath.size()-1; i++)
         {
             output << "setQ({" << aPath[i][0] << ", "  << aPath[i][1] << ", "  << aPath[i][2] << ", "  << aPath[i][3] << ", "  << aPath[i][4] << ", "  << aPath[i][5] << "})" << endl;
         }
+
+        output << "setQ({" << aPath[aPath.size()-1][0] << ", "  << aPath[aPath.size()-1][1] << ", "  << aPath[aPath.size()-1][2] << ", "  << aPath[aPath.size()-1][3] << ", "  << aPath[aPath.size()-1][4] << ", "  << aPath[aPath.size()-1][5] << "})" << endl;
+        output << "attach(bottle,table)" << endl;
 
         output << endl;
         output.close();
@@ -69,7 +90,7 @@ void createLUAScript(string fileName, QPath aPath)
 
 int main(int argc, char** argv)
 {
-    rw::math::Math::seed(); //The seed
+    rw::math::Math::seed(427897842); //The seed
 
     const string wcFile = "../Kr16WallWorkCell/Scene.wc.xml";
 	const string deviceName = "KukaKr16";
@@ -81,10 +102,25 @@ int main(int argc, char** argv)
 		cerr << "Device: " << deviceName << " not found!" << endl;
 		return 0;
 	}
-	const State state = wc->getDefaultState();
+    const State state = wc->getDefaultState();
+    State notConstState= state;
+
+    //Get the bottle-frame:
+    Frame::Ptr bottle = wc->findFrame("Bottle");
+    if(bottle == NULL)
+        cout << "Bottle not found!" << endl;
+
+    //Get the gripper-frame:
+    Frame::Ptr gripper = wc->findFrame("Tool");
+    if(gripper == NULL)
+        cout << "Gripper not found!" << endl;
+
+    //Attach bottle to gripper:
+    Kinematics::gripFrame(wc->findFrame("Bottle"), wc->findFrame("Tool"), notConstState);
+    //cout << "Bottle isDaf() = " << bottle->isDAF() << endl;
 
 	CollisionDetector detector(wc, ProximityStrategyFactory::makeDefaultCollisionStrategy());
-	PlannerConstraint constraint = PlannerConstraint::make(&detector,device,state);
+    PlannerConstraint constraint = PlannerConstraint::make(&detector,device, state);
 
 	/** Most easy way: uses default parameters based on given device
 		sampler: QSampler::makeUniform(device)
