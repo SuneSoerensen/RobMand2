@@ -90,7 +90,8 @@ void createLUAScript(string fileName, QPath aPath)
 
 int main(int argc, char** argv)
 {
-    rw::math::Math::seed(427897842); //The seed
+    //rw::math::Math::seed(427897842); //Seed 1
+    rw::math::Math::seed(563758642); //Seed 2
 
     const string wcFile = "../Kr16WallWorkCell/Scene.wc.xml";
 	const string deviceName = "KukaKr16";
@@ -102,22 +103,21 @@ int main(int argc, char** argv)
 		cerr << "Device: " << deviceName << " not found!" << endl;
 		return 0;
 	}
-    const State state = wc->getDefaultState();
-    State notConstState= state;
+    /*const*/ State state = wc->getDefaultState();
 
     //Get the bottle-frame:
-    Frame::Ptr bottle = wc->findFrame("Bottle");
+    Frame* bottle = wc->findFrame("Bottle");
     if(bottle == NULL)
         cout << "Bottle not found!" << endl;
 
     //Get the gripper-frame:
-    Frame::Ptr gripper = wc->findFrame("Tool");
+    Frame* gripper = wc->findFrame("Tool");
     if(gripper == NULL)
         cout << "Gripper not found!" << endl;
 
+
     //Attach bottle to gripper:
-    Kinematics::gripFrame(wc->findFrame("Bottle"), wc->findFrame("Tool"), notConstState);
-    //cout << "Bottle isDaf() = " << bottle->isDAF() << endl;
+    Kinematics::gripFrame(bottle, gripper, state);
 
 	CollisionDetector detector(wc, ProximityStrategyFactory::makeDefaultCollisionStrategy());
     PlannerConstraint constraint = PlannerConstraint::make(&detector,device, state);
@@ -131,7 +131,7 @@ int main(int argc, char** argv)
 	/** More complex way: allows more detailed definition of parameters and methods */
     QSampler::Ptr sampler = QSampler::makeConstrained(QSampler::makeUniform(device),constraint.getQConstraintPtr());
 	QMetric::Ptr metric = MetricFactory::makeEuclidean<Q>();
-    double extend = 0.01; //Originally = 0.1
+    double extend = 0.1; //Originally = 0.1
     QToQPlanner::Ptr planner = RRTPlanner::makeQToQPlanner(constraint, sampler, metric, extend, RRTPlanner::RRTConnect);
 
     Q from(6,-3.142, -0.827, -3.002, -3.143, 0.099, -1.573); //Pick
