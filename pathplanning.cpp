@@ -19,6 +19,8 @@ using namespace rwlibs::pathplanners;
 using namespace rwlibs::proximitystrategies;
 
 #define MAXTIME 10.
+#define RUNS_PER_EPS 10
+
 
 bool checkCollisions(Device::Ptr device, const State &state, const CollisionDetector &detector, const Q &q)
 {
@@ -88,80 +90,96 @@ void createLUAScript(string fileName, QPath aPath)
     }
 }
 
-int main(int argc, char** argv)
+/*void exportWorkerResults(string filename, int length, double time)
 {
-    //rw::math::Math::seed(427897842); //Seed 1
-    rw::math::Math::seed(563758642); //Seed 2
+
+
+}*/
+
+void workerFunc(double eps, unsigned int aSeed)
+{
+    cout << "Worker with eps = " << eps << " started!" << endl;
+    ofstream out(to_string(eps) + "data");//For exporting data
+
+    rw::math::Math::seed(aSeed); //Set the seed
 
     const string wcFile = "../Kr16WallWorkCell/Scene.wc.xml";
-	const string deviceName = "KukaKr16";
-	cout << "Trying to use workcell " << wcFile << " and device " << deviceName << endl;
+    const string deviceName = "KukaKr16";
 
-	WorkCell::Ptr wc = WorkCellLoader::Factory::load(wcFile);
-	Device::Ptr device = wc->findDevice(deviceName);
-	if (device == NULL) {
-		cerr << "Device: " << deviceName << " not found!" << endl;
-		return 0;
-	}
-    /*const*/ State state = wc->getDefaultState();
+
+    WorkCell::Ptr wc = WorkCellLoader::Factory::load(wcFile);
+    Device::Ptr device = wc->findDevice(deviceName);
+    /*const*/ State state = wc->getDefaultState(); //Cannot be const, then bottle can't be grasped!
 
     //Get the bottle-frame:
     Frame* bottle = wc->findFrame("Bottle");
-    if(bottle == NULL)
-        cout << "Bottle not found!" << endl;
 
     //Get the gripper-frame:
     Frame* gripper = wc->findFrame("Tool");
-    if(gripper == NULL)
-        cout << "Gripper not found!" << endl;
-
-
     //Attach bottle to gripper:
     Kinematics::gripFrame(bottle, gripper, state);
 
-	CollisionDetector detector(wc, ProximityStrategyFactory::makeDefaultCollisionStrategy());
+    //Construct planner
+    CollisionDetector detector(wc, ProximityStrategyFactory::makeDefaultCollisionStrategy());
     PlannerConstraint constraint = PlannerConstraint::make(&detector,device, state);
 
-	/** Most easy way: uses default parameters based on given device
-		sampler: QSampler::makeUniform(device)
-		metric: PlannerUtil::normalizingInfinityMetric(device->getBounds())
-        extend: 0.05 */
-    //QToQPlanner::Ptr planner = RRTPlanner::makeQToQPlanner(constraint, device, RRTPlanner::RRTConnect);
-
-	/** More complex way: allows more detailed definition of parameters and methods */
+    /** More complex way: allows more detailed definition of parameters and methods */
     QSampler::Ptr sampler = QSampler::makeConstrained(QSampler::makeUniform(device),constraint.getQConstraintPtr());
-	QMetric::Ptr metric = MetricFactory::makeEuclidean<Q>();
-    double extend = 0.1; //Originally = 0.1
+    QMetric::Ptr metric = MetricFactory::makeEuclidean<Q>();
+    double extend = eps;
     QToQPlanner::Ptr planner = RRTPlanner::makeQToQPlanner(constraint, sampler, metric, extend, RRTPlanner::RRTConnect);
 
     Q from(6,-3.142, -0.827, -3.002, -3.143, 0.099, -1.573); //Pick
-	//Q to(6,1.7,0.6,-0.8,0.3,0.7,-0.5); // Very difficult for planner
     Q to(6, 1.571, 0.006, 0.030, 0.153, 0.762, 4.490); //Place
 
-	if (!checkCollisions(device, state, detector, from))
-		return 0;
-	if (!checkCollisions(device, state, detector, to))
-		return 0;
+    /*if (!checkCollisions(device, state, detector, from))
+        return 0;
+    if (!checkCollisions(device, state, detector, to))
+        return 0;*/
 
-	cout << "Planning from " << from << " to " << to << endl;
-	QPath path;
-	Timer t;
-	t.resetAndResume();
-	planner->query(from,to,path,MAXTIME);
-	t.pause();
-	cout << "Path of length " << path.size() << " found in " << t.getTime() << " seconds." << endl;
-	if (t.getTime() >= MAXTIME) {
-		cout << "Notice: max time of " << MAXTIME << " seconds reached." << endl;
-	}
+    QPath path;
+    Timer t;
+    string filename;
+    //Run a number of times for the given eps:
+    for(int i = 0; i < RUNS_PER_EPS; i++)
+    {
+        t.resetAndResume();
+        planner->query(from,to,path,MAXTIME);
+        t.pause();
 
-    /*for (QPath::iterator it = path.begin(); it < path.end(); it++) {
-		cout << *it << endl;
-    }*/
+        out << i+1 << "\t" << path.size() << "\t" << t.getTime() << endl; //Export results to file
+        filename = to_string(i) + "_eps" + to_string(eps) + ".lua";
+        createLUAScript(filename, path); //Create script for verifying path (in case of doubt)
+        path.clear();
+    }
 
-    cout << "First element of path: " << path[0] << endl;
-    cout << "Creating LUA script" << endl;
-    createLUAScript("myLUAScript.lua", path);
+    out.close();
+    cout << "Worker with eps = " << eps << " done!" << endl;
+}
 
-	cout << "Program done." << endl;
+int main(int argc, char** argv)
+{
+    unsigned int seed1 = 427897842; //Seed 1
+    unsigned int seed2 = 563758642;   //Seed 2
+    unsigned int seed3 = 645370379;   //Seed 3
+    unsigned int seed4 = 436567765;   //Seed 4
+    unsigned int seed5 = 234567865;  //Seed 5
+    unsigned int seed6 = 236677678;  //Seed 6
+    unsigned int seed7 = 562896554;   //Seed 7
+    unsigned int seed8 = 120058763;   //Seed 8
+    unsigned int seed9 = 424242425;  //Seed 9
+    unsigned int seed10 = 629326;      //Seed 10
+
+    workerFunc(1.0, seed1);
+    workerFunc(0.9, seed2);
+    workerFunc(0.8, seed3);
+    workerFunc(0.7, seed4);
+    workerFunc(0.6, seed5);
+    workerFunc(0.5, seed6);
+    workerFunc(0.4, seed7);
+    workerFunc(0.3, seed8);
+    workerFunc(0.2, seed9);
+    workerFunc(0.1, seed10);
+
 	return 0;
 }
