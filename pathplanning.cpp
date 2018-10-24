@@ -154,11 +154,21 @@ int main(int argc, char** argv)
     unsigned int seeds[10] = {427897842, 563758642, 645370379, 436567765, 234567865, 236677678, 562896554, 120058763, 424242425, 629326};
     int seedIndex;
 
+    //First round:
     for(double eps = 0.1; eps <= 1.0; eps += 0.1)
     {
         seedIndex = eps/0.1;
         workerFunc(eps, seeds[seedIndex]);
     }
+
+    //Second round:
+    for(double eps = 0.95; eps <= 1.05; eps += 0.01)
+    {
+        seedIndex = (eps - 0.95) / 0.01;
+        workerFunc(eps, seeds[seedIndex]);
+    }
+
+
 
 	return 0;
 }
