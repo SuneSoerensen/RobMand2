@@ -168,15 +168,5 @@ int main(int argc, char** argv)
         workerFunc(eps, seeds[seedIndex]);
     }
 
-   /* //Stage 3:
-    for(double eps = 0.95; eps <= 1.05; eps += 0.01)
-    {
-        seedIndex = (eps - 0.95) / 0.01;
-        cout << "Using seed no. " << seedIndex << endl;
-        workerFunc(eps, seeds[seedIndex]);
-    }*/
-
-
-
 	return 0;
 }
