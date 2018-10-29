@@ -96,7 +96,7 @@ void createLUAScript(string fileName, QPath aPath)
 void workerFunc(double eps, unsigned int aSeed)
 {
     cout << "Worker with eps = " << eps << " started!" << endl;
-    ofstream out(to_string(eps) + "data");//For exporting data
+    ofstream out("../data/" + to_string(eps) + "data.csv"); //For exporting data
 
     rw::math::Math::seed(aSeed); //Set the seed
 
@@ -154,19 +154,27 @@ int main(int argc, char** argv)
     unsigned int seeds[10] = {427897842, 563758642, 645370379, 436567765, 234567865, 236677678, 562896554, 120058763, 424242425, 629326};
     int seedIndex;
 
-    //First round:
-    for(double eps = 0.1; eps <= 1.0; eps += 0.1)
+    //Stage 1:
+    for(double eps = 1.0; eps <= 10.0; eps += 1.0)
     {
-        seedIndex = eps/0.1;
+        workerFunc(eps, seeds[(int)eps-1]);
+    }
+
+    //Stage 2:
+    for(double eps = 0.5; eps <= 1.5; eps += 0.1)
+    {
+        seedIndex = (eps - 0.5) / 0.1;
+        cout << "Using seed no. " << seedIndex << endl;
         workerFunc(eps, seeds[seedIndex]);
     }
 
-    //Second round:
+   /* //Stage 3:
     for(double eps = 0.95; eps <= 1.05; eps += 0.01)
     {
         seedIndex = (eps - 0.95) / 0.01;
+        cout << "Using seed no. " << seedIndex << endl;
         workerFunc(eps, seeds[seedIndex]);
-    }
+    }*/
 
 
 
